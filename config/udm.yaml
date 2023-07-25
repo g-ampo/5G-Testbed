@@ -1,0 +1,9 @@
+logger:
+    file: /var/log/open5gs/udm.log
+udm:
+  sbi:   
+  - addr: 0.0.0.0
+    advertise: open5gs-udm
+nrf:
+ sbi:
+  name: open5gs-nrf

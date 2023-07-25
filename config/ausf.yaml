@@ -1,0 +1,9 @@
+logger:
+    file: /var/log/open5gs/ausf.log
+ausf:
+  sbi:   
+  - addr: 0.0.0.0
+    advertise: open5gs-ausf
+nrf:
+ sbi:
+  name: open5gs-nrf

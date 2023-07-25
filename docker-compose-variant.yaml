@@ -1,0 +1,228 @@
+version: '3.8'
+volumes:
+  mongodbdata-open5gs-5g: {}
+networks:
+   open5gs:
+      driver: bridge
+      enable_ipv6: false
+      ipam:
+        driver: default
+        config:
+          - subnet: 172.21.0.0/24
+            gateway: 172.21.0.1
+services:
+  mongodb:
+    container_name: "mongodb"
+    image: mongo:5.0.0-rc1
+    expose:
+    - "27017/tcp"
+    volumes:
+    - mongodbdata-open5gs-5g:/var/lib/mongodb
+    - ./scripts/open5gs-dbctl.sh:/scripts/open5gs-dbctl.sh
+#    command: bash -c "cd scripts && chmod +x open5gs-dbctl.sh"
+#    command: bash -c "cd scripts && open5gs-dbctl.sh add 208930000000001 0C0A34601D4F07677303652C0462535B 63bfa50ee6523365ff14c1f45f88737d"
+#    command: tail -F /scripts/open5gs-dbctl.sh
+    networks:
+      open5gs:
+        ipv4_address: 172.21.0.101
+  webui:
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-webui
+      container_name: open5gs-webui
+      expose:
+      - "3000/tcp"
+      ports:
+      - "3000:3000"
+      depends_on:
+      - mongodb
+      environment:
+      - DB_URI=mongodb://mongodb/open5gs
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.103
+  open5gs-nrf:
+      container_name: "open5gs-nrf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-nrfd", "-c", "/open5gs/configs/nrf.yaml"]
+      volumes:
+      - ./config/nrf.yaml:/open5gs/configs/nrf.yaml
+      expose:
+      - "80/tcp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.100
+  open5gs-amf:
+      container_name: "open5gs-amf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-amfd", "-c", "/open5gs/configs/amf.yaml"]
+      volumes:
+      - ./config/amf.yaml:/open5gs/configs/amf.yaml
+      expose:
+      - "38412/sctp"
+      - "80/tcp"
+      # ports:
+      # - "38412:38412/sctp"
+      depends_on:
+      - open5gs-nrf
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.104
+  open5gs-udm:
+      container_name: "open5gs-udm"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-udmd", "-c", "/open5gs/configs/udm.yaml"]
+      volumes:
+      - ./config/udm.yaml:/open5gs/configs/udm.yaml
+      expose:
+      - "80/tcp"
+      depends_on:
+      - open5gs-nrf
+      - open5gs-udr
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.105
+  open5gs-ausf:
+      container_name: "open5gs-ausf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-ausfd", "-c", "/open5gs/configs/ausf.yaml"]
+      volumes:
+      - ./config/ausf.yaml:/open5gs/configs/ausf.yaml
+      expose:
+      - "80/tcp"
+      depends_on:
+      - open5gs-nrf
+      - open5gs-udr
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.114
+  open5gs-udr:
+      container_name: "open5gs-udr"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-udrd", "-c", "/open5gs/configs/udr.yaml"]
+      volumes:
+      - ./config/udr.yaml:/open5gs/configs/udr.yaml
+      depends_on:
+      - open5gs-nrf
+      - mongodb
+      expose:
+      - "80/tcp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.106
+  open5gs-smf:
+      container_name: "open5gs-smf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      depends_on:
+      - open5gs-nrf
+      command: ["open5gs-smfd", "-c", "/open5gs/configs/smf.yaml"]
+      volumes:
+      - ./config/smf.yaml:/open5gs/configs/smf.yaml
+      depends_on:
+        - open5gs-nrf
+      expose:
+      - "2123/udp"
+      - "80/tcp"
+      - "8805/udp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.107
+  open5gs-smf-impostor:
+      container_name: "open5gs-smf-impostor"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      depends_on:
+      - open5gs-nrf
+      command: ["open5gs-smfd", "-c", "/open5gs/configs/smf.yaml"]
+      volumes:
+      - ./config/smf.yaml:/open5gs/configs/smf.yaml
+      depends_on:
+        - open5gs-nrf
+      expose:
+      - "2123/udp"
+      - "80/tcp"
+      - "8805/udp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.120
+  open5gs-pcf:
+      container_name: "open5gs-pcf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-pcfd", "-c", "/open5gs/configs/pcf.yaml"]
+      volumes:
+      - ./config/pcf.yaml:/open5gs/configs/pcf.yaml
+      expose:
+      - "80/tcp"
+      depends_on:
+      - mongodb
+      - open5gs-nrf
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.108
+  open5gs-nssf:
+      container_name: "open5gs-nssf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      command: ["open5gs-nssfd", "-c", "/open5gs/configs/nssf.yaml"]
+      volumes:
+      - ./config/nssf.yaml:/open5gs/configs/nssf.yaml
+      depends_on:
+      - open5gs-nrf
+      expose:
+      - "80/tcp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.109
+  open5gs-upf:
+      container_name: "open5gs-upf"
+      image: registry.gitlab.com/k3y/k3c5g/open5gs-aio
+      cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      cap_drop:
+      - ALL
+      privileged: true
+      command: >
+        sh -c  "ip tuntap add name ogstun mode tun &&
+                ip addr add 10.45.0.1/16 dev ogstun &&
+                sysctl -w net.ipv6.conf.all.disable_ipv6=0 &&
+                ip link set ogstun up &&
+                echo 1 > /proc/sys/net/ipv4/ip_forward &&
+                iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE &&
+                open5gs-upfd -c /open5gs/configs/upf.yaml"
+      volumes:
+      - ./config/upf.yaml:/open5gs/configs/upf.yaml
+      depends_on:
+      - open5gs-nrf
+      #ports:
+      # - "2152:2152/udp"
+      expose:
+      - "2152/udp"
+      - "8805/udp"
+      networks:
+        open5gs:
+          ipv4_address: 172.21.0.110
+  ueransim-gnb-0:
+      image: registry.gitlab.com/k3y/k3c5g/ueransim
+      tty: true
+      privileged: true
+      container_name: ueransim-gnb-0
+      volumes:
+      - ./config/oai-gnb-0.yaml:/UERANSIM/build/oai-gnb.yaml #command to be executed: ./nr-gnb -c ./oai-gnb.yaml
+      command: sh -c  "./nr-gnb -c ./oai-gnb.yaml" #!
+      depends_on:
+      - open5gs-upf
+      - open5gs-amf
+      networks:
+          open5gs:
+              ipv4_address: 172.21.0.111
+  ueransim-ue-0:
+      image: registry.gitlab.com/k3y/k3c5g/ueransim
+      tty: true
+      privileged: true
+      container_name: ueransim-ue-0
+      volumes:
+      - ./config/oai-ue.yaml:/UERANSIM/build/oai-ue.yaml #After resgistering the UE in the webui: command to be executed: ./nr-ue -c ./oai-ue.yaml
+      depends_on:
+      - ueransim-gnb-0
+      networks:
+          open5gs:
+              ipv4_address: 172.21.0.112

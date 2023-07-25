@@ -1,0 +1,11 @@
+logger:
+    file: /var/log/open5gs/pcf.log
+
+db_uri: mongodb://mongodb/open5gs
+pcf:
+  sbi:     
+  - addr: 0.0.0.0
+    advertise: open5gs-pcf
+nrf:
+ sbi:
+  name: open5gs-nrf
